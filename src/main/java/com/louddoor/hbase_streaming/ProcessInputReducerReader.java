@@ -85,6 +85,7 @@ public class ProcessInputReducerReader extends Thread {
 			}
 			
 			stop = false;
+			_proc.destroy();
 
 		} catch (NumberFormatException e) {
 			e.printStackTrace();

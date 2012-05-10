@@ -62,11 +62,26 @@ public class StreamingJob {
 			map = values.getNoVersionMap();			
 			
 			try {
-				
-				JSONObject val = new JSONObject(values.getNoVersionMap());
-				
+
+				JSONObject val = new JSONObject();
+
+				for(Entry<byte[], NavigableMap<byte[], byte[]>> ent : map.entrySet())
+				{
+					JSONObject innerVal = new JSONObject();
+					for(Entry<byte[], byte[]> inner : ent.getValue().entrySet())
+					{
+						Object value;
+						
+						value = Bytes.toString(inner.getValue());
+						
+						innerVal.put(Bytes.toString(inner.getKey()), value);
+					}
+
+					val.put(Bytes.toString(ent.getKey()), innerVal);
+				}
+
 				line = Bytes.toString(rowKey.get()) + "\t" + val.toString() + "\n";
-				
+
 				writeOut.write(line);
 				
 			} catch(Exception e) {
@@ -101,19 +116,26 @@ public class StreamingJob {
 		}
 		
 		public void setupProc(Context context) throws IOException{
-			proc = StreamingUtils.buildProcess(context.getConfiguration().get("mapper.command"));
-			
-			out = proc.getOutputStream();
-			writeOut = new BufferedWriter(new OutputStreamWriter(out));
-			
 			if(procin != null)
 			{
 				procin.stopThread();
 				procin.interrupt();
 			}
 			
+			proc = StreamingUtils.buildProcess(context.getConfiguration().get("mapper.command"));
+			
+			out = proc.getOutputStream();
+			writeOut = new BufferedWriter(new OutputStreamWriter(out));
+			
+			
+			
 			procin = new ProcessInputMapperReader(proc, context);
 			procin.start();
+		}
+		
+		public void cleanup(Context context)
+		{
+			procin.stopThread();
 		}
 	}
 	
@@ -180,19 +202,24 @@ public class StreamingJob {
 		}
 		
 		public void setupProc(Context context) throws IOException{
-			proc = StreamingUtils.buildProcess(context.getConfiguration().get("mapper.command"));
-			
-			out = proc.getOutputStream();
-			writeOut = new BufferedWriter(new OutputStreamWriter(out));
-			
 			if(procin != null)
 			{
 				procin.stopThread();
 				procin.interrupt();
 			}
 			
+			proc = StreamingUtils.buildProcess(context.getConfiguration().get("mapper.command"));
+			
+			out = proc.getOutputStream();
+			writeOut = new BufferedWriter(new OutputStreamWriter(out));
+			
 			procin = new ProcessInputReducerReader(proc, context);
 			procin.start();
+		}
+		
+		public void cleanup(Context context)
+		{
+			procin.stopThread();
 		}
 	
 	}
