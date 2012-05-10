@@ -112,6 +112,20 @@ public class StreamingJob {
 					context.write(cKey, cVal);
 				}
 				
+				while(errIn.ready())
+				{
+					String errLine = errIn.readLine();
+					
+					if(errLine.contains("reporter:counter"))
+					{
+						String[] parts = errLine.split(":")[2].split(",");
+						
+						context.getCounter(parts[0], parts[1]).increment(Long.parseLong(parts[2]));
+					} else {
+						System.err.println(errLine);
+					}
+				}
+				
 			} catch(Exception e) {
 				e.printStackTrace();
 			}
