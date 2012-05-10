@@ -1,4 +1,6 @@
 {
+	"name": "edges_count",
+	
     "input":{
         "hbase_table": "users",
         "scan_caching": 150,

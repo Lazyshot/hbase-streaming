@@ -244,11 +244,16 @@ public class StreamingJob {
 							.withDescription("Mapper Command")
 							.create("mapper");
 		
+		Option name = OptionBuilder.withArgName("name").hasArgs()
+							.withDescription("Name of the job for reference")
+							.create("name");
+		
 		options.addOption(configOption);
 		options.addOption(files);
 		options.addOption(numReducers);
 		options.addOption(reducerCmd);
 		options.addOption(mapperCmd);
+		options.addOption(name);
 		
 		return options;
 	}
@@ -280,15 +285,17 @@ public class StreamingJob {
 	public static Job configureJob(Configuration conf, String [] args)
 		throws Exception
 	{
+		Options options = setOptions();
+		CommandLineParser parser = new GnuParser();
+		CommandLine line = parser.parse(options, args);		
 		Job job = new Job();
 		Scan scan = new Scan();
 		String table = "";
 		String outFile = "";
 		boolean overwrite = true;
-		Options options = setOptions();
 		
-		CommandLineParser parser = new GnuParser();
-		CommandLine line = parser.parse(options, args);
+		String name = line.getOptionValue("name");
+		
 		
 		job.setJarByClass(StreamingJob.class);
 		
@@ -371,6 +378,15 @@ public class StreamingJob {
 			}
 		}
 		
+		if(config.has("name") && name == null)
+		{
+			name = config.getString("name");
+		}
+		
+		if(name == null)
+			name = NAME;
+		
+		job.setJobName(name);
 		job.setInputFormatClass(TableInputFormat.class);
 		
 		TableMapReduceUtil.initTableMapperJob(table, scan, StreamingMapper.class, Text.class, Text.class, job);
