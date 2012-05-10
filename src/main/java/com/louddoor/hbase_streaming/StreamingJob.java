@@ -130,8 +130,11 @@ public class StreamingJob {
 			out = proc.getOutputStream();
 			writeOut = new BufferedWriter(new OutputStreamWriter(out));
 			
-			procin.stopThread();
-			procin.interrupt();
+			if(procin != null)
+			{
+				procin.stopThread();
+				procin.interrupt();
+			}
 			
 			procin = new ProcessInputMapperReader(proc, context);
 			procin.start();
@@ -142,54 +145,47 @@ public class StreamingJob {
 	{
 		Process proc = null;
 		OutputStream out;
-		InputStream in;
-		InputStream err;
 		BufferedWriter writeOut;
-		BufferedReader readIn;
-		BufferedReader errIn;
+		
+		ProcessInputReducerReader procin;
 		
 		String line = "";
 		NavigableMap<byte[], NavigableMap<byte[], byte[]>> map;
 		
-		Text cKey = new Text();
-		Text cVal = new Text();
-
 		public void reduce(Text id, Iterable<Text> values, Context context)
 			throws IOException, InterruptedException 
 		{
+			JSONArray vals = new JSONArray();
+			
+			for(Text val : values)
+			{
+				vals.put(val.toString());
+			}
+			
+			reduce(id, vals, context, 0);
+		}
+		
+		public void reduce(Text id, JSONArray values, Context context, int retries)
+			throws IOException, InterruptedException 
+		{
 			try {
-				JSONArray vals = new JSONArray();
 				
-				for(Text val : values)
-				{
-					vals.put(val.toString());
-				}
-				
-				line = id + "\t" + vals.toString() + "\n";
+				line = id + "\t" + values.toString() + "\n";
 				
 				writeOut.write(line);
 				
-				while(readIn.ready())
+			} catch(Exception e) {				
+				if(e.getMessage().contains("pipe"))
 				{
-					String readLine = readIn.readLine();
-					String[] lineParts = readLine.split("\t");
-					String sval = "";
-					
-					for(int i = 0; i < lineParts.length; i++)
+					if(retries > 5)
 					{
-						if(i == 0)
-							cKey.set(lineParts[i]);
-						else
-							sval += lineParts[i] + "\t";
-						
+						throw new InterruptedException("Mapper failed to launch process 5 times - Check err logs");
 					}
 					
-					cVal.set(sval);
-					
-					context.write(cKey, cVal);
+					setupProc(context);
+					reduce(id, values, context, retries + 1);
 				}
 				
-			} catch(Exception e) {
 				e.printStackTrace();
 			}
 
@@ -201,18 +197,26 @@ public class StreamingJob {
 		{
 			try {
 				StreamingUtils.downloadFiles(context);
-				proc = StreamingUtils.buildProcess(context.getConfiguration().get("reducer.command"));
-				
-				out = proc.getOutputStream();
-				in = proc.getInputStream();
-				err = proc.getErrorStream();
-				
-				writeOut = new BufferedWriter(new OutputStreamWriter(out));
-				readIn = new BufferedReader(new InputStreamReader(in));
-				errIn = new BufferedReader(new InputStreamReader(err));
+				setupProc(context);
 			} catch (JSONException e) {
 				e.printStackTrace();
 			}
+		}
+		
+		public void setupProc(Context context) throws IOException{
+			proc = StreamingUtils.buildProcess(context.getConfiguration().get("mapper.command"));
+			
+			out = proc.getOutputStream();
+			writeOut = new BufferedWriter(new OutputStreamWriter(out));
+			
+			if(procin != null)
+			{
+				procin.stopThread();
+				procin.interrupt();
+			}
+			
+			procin = new ProcessInputReducerReader(proc, context);
+			procin.start();
 		}
 	
 	}
