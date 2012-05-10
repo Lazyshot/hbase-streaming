@@ -17,9 +17,9 @@ function emit($key, $val)
         echo $key . "\t" . $val . "\n";
 }
 
-while($line = trim(fgets(STDIN)))
+while(true)
 {
-
+		$line = trim(fgets(STDIN));
         $parts = explode("\t", $line);
         proc($parts[0], explode(",", $parts[1]));
 }

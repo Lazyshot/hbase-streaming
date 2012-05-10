@@ -27,9 +27,10 @@ function emit($key, $val)
         echo $key . "\t" . $val . "\n";
 }
 
-while($line = trim(fgets(STDIN)))
+while(true)
 {
-        $parts = explode("\t", $line);
+		$line = trim(fgets(STDIN));
+		$parts = explode("\t", $line);
 
         if(count($parts) < 2)
                 fwrite(STDERR, "issue with input: " . $line);
