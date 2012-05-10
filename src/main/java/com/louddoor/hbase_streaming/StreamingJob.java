@@ -1,11 +1,8 @@
 package com.louddoor.hbase_streaming;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.util.Map.Entry;
@@ -66,28 +63,7 @@ public class StreamingJob {
 			
 			try {
 				
-				JSONObject val = new JSONObject();
-				
-				for(Entry<byte[], NavigableMap<byte[], byte[]>> ent : map.entrySet())
-				{
-					JSONObject innerVal = new JSONObject();
-
-					for(Entry<byte[], byte[]> inner : ent.getValue().entrySet())
-					{
-						Object value;
-						
-						try {
-							value = Bytes.toInt(inner.getValue());
-						} catch(Exception e) {
-							value = Bytes.toString(inner.getValue());
-						}
-						
-						innerVal.put(Bytes.toString(inner.getKey()), value);
-						
-					}
-
-					val.put(Bytes.toString(ent.getKey()), innerVal);
-				}
+				JSONObject val = new JSONObject(values.getNoVersionMap());
 				
 				line = Bytes.toString(rowKey.get()) + "\t" + val.toString() + "\n";
 				
