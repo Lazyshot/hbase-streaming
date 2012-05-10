@@ -1,6 +1,7 @@
 package com.louddoor.hbase_streaming;
 
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Iterator;
@@ -33,9 +34,14 @@ public class StreamingUtils {
 		while(it.hasNext())
 		{
 			String file = it.next();
+			File f = new File(file);
 			String contents = files.getString(file);
 			
-			FileWriter out = new FileWriter(file, false);
+			f.createNewFile();
+			f.setExecutable(true);
+			f.setReadable(true);
+			
+			FileWriter out = new FileWriter(f, false);
 			BufferedWriter writ = new BufferedWriter(out);
 			
 			writ.write(contents);			
