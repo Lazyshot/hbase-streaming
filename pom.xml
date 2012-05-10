@@ -4,11 +4,26 @@
 
   <groupId>com.louddoor</groupId>
   <artifactId>hbase-streaming</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
+  <version>0.0.1</version>
   <packaging>jar</packaging>
 
   <name>hbase-streaming</name>
-  <url>http://maven.apache.org</url>
+  <url>http://github.com/lazyshot/hbase-streaming</url>
+
+  <build>
+	  <plugins>
+	  	<plugin>
+	  		<artifactId>maven-assembly-plugin</artifactId>
+	  		<configuration>
+	  			<descriptorRefs>
+	  				<descriptorRef>
+	  					jar-with-dependencies
+	  				</descriptorRef>
+	  			</descriptorRefs>
+	  		</configuration>
+	  	</plugin>
+	  </plugins>
+  </build>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
