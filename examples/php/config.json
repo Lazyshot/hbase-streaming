@@ -1,15 +1,15 @@
 {
 	"name": "edges_count",
 	
-    "input":{
-        "hbase_table": "users",
-        "scan_caching": 150,
-        "families": ["info", "pages"]
-    },
-    
-    "output": {
-        "type": "hdfs",
-        "path": "/user/bryan/example_job",
-        "overwrite": true
-    }
+	"input":{
+		"hbase_table": "users",
+		"scan_caching": 150,
+		"families": ["info", "pages"]
+	},
+	
+	"output": {
+		"type": "hdfs",
+		"path": "/user/bryan/example_job",
+		"overwrite": true
+	}
 }

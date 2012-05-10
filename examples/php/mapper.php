@@ -5,13 +5,11 @@
 function proc($key, $val){
 
         incCounter("Users", "Total");
-        incCounter("Users", "NumFriends", count($val['friends']));
         
         if(empty($val['pages']))
                 return;
 
         incCounter("Users", "NumPages", count($val['pages']));
-
 
         foreach($val['pages'] as $page_id => $val){
                 emit($page_id, 1);
@@ -31,9 +29,12 @@ function emit($key, $val)
 
 while($line = trim(fgets(STDIN)))
 {
-
         $parts = explode("\t", $line);
-        proc($parts[0], json_decode($parts[1], true));
+
+        if(count($parts) < 2)
+                fwrite(STDERR, "issue with input: " . $line);
+        else
+                proc($parts[0], json_decode($parts[1], true));
 }
 
 
