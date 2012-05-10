@@ -43,3 +43,5 @@ function exec(key, vals) {
 	
 	emit(key, sum);
 }
+
+stdin.resume();

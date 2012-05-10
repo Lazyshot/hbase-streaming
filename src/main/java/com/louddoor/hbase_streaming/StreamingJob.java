@@ -47,17 +47,11 @@ public class StreamingJob {
 	{
 		Process proc = null;
 		OutputStream out;
-		InputStream in;
-		InputStream err;
 		BufferedWriter writeOut;
-		BufferedReader readIn;
-		BufferedReader errIn;
+		ProcessInputMapperReader procin;
 		
 		String line = "";
 		NavigableMap<byte[], NavigableMap<byte[], byte[]>> map;
-		
-		Text cKey = new Text();
-		Text cVal = new Text();
 		
 		public void map(ImmutableBytesWritable rowKey, Result values, Context context) 
 		throws IOException,  InterruptedException
@@ -71,39 +65,6 @@ public class StreamingJob {
 			map = values.getNoVersionMap();			
 			
 			try {
-				while(readIn.ready())
-				{
-					String readLine = readIn.readLine();
-					String[] lineParts = readLine.split("\t");
-					String sval = "";
-					
-					for(int i = 0; i < lineParts.length; i++)
-					{
-						if(i == 0)
-							cKey.set(lineParts[i]);
-						else
-							sval += lineParts[i] + "\t";
-						
-					}
-					
-					cVal.set(sval);
-					
-					context.write(cKey, cVal);
-				}
-				
-				while(errIn.ready())
-				{
-					String errLine = errIn.readLine();
-					
-					if(errLine.contains("reporter:counter"))
-					{
-						String[] parts = errLine.split(":")[2].split(",");
-						
-						context.getCounter(parts[0], parts[1]).increment(Long.parseLong(parts[2]));
-					} else {
-						System.err.println(errLine);
-					}
-				}
 				
 				JSONObject val = new JSONObject();
 				
@@ -131,8 +92,6 @@ public class StreamingJob {
 				line = Bytes.toString(rowKey.get()) + "\t" + val.toString() + "\n";
 				
 				writeOut.write(line);
-				
-				
 				
 			} catch(Exception e) {
 				
@@ -169,12 +128,13 @@ public class StreamingJob {
 			proc = StreamingUtils.buildProcess(context.getConfiguration().get("mapper.command"));
 			
 			out = proc.getOutputStream();
-			in = proc.getInputStream();
-			err = proc.getErrorStream();
-			
 			writeOut = new BufferedWriter(new OutputStreamWriter(out));
-			readIn = new BufferedReader(new InputStreamReader(in));
-			errIn = new BufferedReader(new InputStreamReader(err));
+			
+			procin.stopThread();
+			procin.interrupt();
+			
+			procin = new ProcessInputMapperReader(proc, context);
+			procin.start();
 		}
 	}
 	

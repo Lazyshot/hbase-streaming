@@ -42,3 +42,5 @@ function exec(key, val) {
         }
     }
 }
+
+stdin.resume();
