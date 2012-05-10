@@ -44,7 +44,10 @@ public class StreamingUtils {
 			FileWriter out = new FileWriter(f, false);
 			BufferedWriter writ = new BufferedWriter(out);
 			
-			writ.write(contents);			
+			writ.write(contents);
+			
+			writ.close();
+			out.close();
 		}
 	}
 	
