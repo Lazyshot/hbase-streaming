@@ -29,7 +29,6 @@ import org.apache.hadoop.hbase.mapreduce.TableInputFormat;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -278,7 +277,7 @@ public class StreamingJob {
 		return contents.toString();
 	}
 
-	public static Job configureJob_Permutations(Configuration conf, String [] args)
+	public static Job configureJob(Configuration conf, String [] args)
 		throws Exception
 	{
 		Job job = new Job();
@@ -291,6 +290,7 @@ public class StreamingJob {
 		CommandLineParser parser = new GnuParser();
 		CommandLine line = parser.parse(options, args);
 		
+		job.setJarByClass(StreamingJob.class);
 		
 		if(line.hasOption("help"))
 		{
@@ -407,12 +407,9 @@ public class StreamingJob {
 		Configuration conf = HBaseConfiguration.create();
 		String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
 		
-		Job job_permutations = configureJob_Permutations(conf, otherArgs);
+		Job job = configureJob(conf, otherArgs);
 				
-		job_permutations.waitForCompletion(true);
+		job.waitForCompletion(true);
 		
 	}
-	
-	
-	
 }
