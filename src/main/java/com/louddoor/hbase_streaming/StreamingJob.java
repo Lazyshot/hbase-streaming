@@ -58,40 +58,19 @@ public class StreamingJob {
 		
 		Text cKey = new Text();
 		Text cVal = new Text();
-
+		
 		public void map(ImmutableBytesWritable rowKey, Result values, Context context) 
 		throws IOException,  InterruptedException
 		{
-			map = values.getNoVersionMap();
+			map(rowKey, values, context, 0);
+		}
+
+		public void map(ImmutableBytesWritable rowKey, Result values, Context context, int retries) 
+		throws IOException,  InterruptedException
+		{
+			map = values.getNoVersionMap();			
 			
 			try {
-				JSONObject val = new JSONObject();
-				
-				for(Entry<byte[], NavigableMap<byte[], byte[]>> ent : map.entrySet())
-				{
-					JSONObject innerVal = new JSONObject();
-
-					for(Entry<byte[], byte[]> inner : ent.getValue().entrySet())
-					{
-						Object value;
-						
-						try {
-							value = Bytes.toInt(inner.getValue());
-						} catch(Exception e) {
-							value = Bytes.toString(inner.getValue());
-						}
-						
-						innerVal.put(Bytes.toString(inner.getKey()), value);
-						
-					}
-
-					val.put(Bytes.toString(ent.getKey()), innerVal);
-				}
-				
-				line = Bytes.toString(rowKey.get()) + "\t" + val.toString() + "\n";
-				
-				writeOut.write(line);
-				
 				while(readIn.ready())
 				{
 					String readLine = readIn.readLine();
@@ -126,7 +105,48 @@ public class StreamingJob {
 					}
 				}
 				
+				JSONObject val = new JSONObject();
+				
+				for(Entry<byte[], NavigableMap<byte[], byte[]>> ent : map.entrySet())
+				{
+					JSONObject innerVal = new JSONObject();
+
+					for(Entry<byte[], byte[]> inner : ent.getValue().entrySet())
+					{
+						Object value;
+						
+						try {
+							value = Bytes.toInt(inner.getValue());
+						} catch(Exception e) {
+							value = Bytes.toString(inner.getValue());
+						}
+						
+						innerVal.put(Bytes.toString(inner.getKey()), value);
+						
+					}
+
+					val.put(Bytes.toString(ent.getKey()), innerVal);
+				}
+				
+				line = Bytes.toString(rowKey.get()) + "\t" + val.toString() + "\n";
+				
+				writeOut.write(line);
+				
+				
+				
 			} catch(Exception e) {
+				
+				if(e.getMessage().contains("pipe"))
+				{
+					if(retries > 5)
+					{
+						throw new InterruptedException("Mapper failed to launch process 5 times - Check err logs");
+					}
+					
+					setupProc(context);
+					map(rowKey, values, context, retries + 1);
+				}
+				
 				e.printStackTrace();
 			}
 
@@ -138,18 +158,23 @@ public class StreamingJob {
 		{
 			try {
 				StreamingUtils.downloadFiles(context);
-				proc = StreamingUtils.buildProcess(context.getConfiguration().get("mapper.command"));
-				
-				out = proc.getOutputStream();
-				in = proc.getInputStream();
-				err = proc.getErrorStream();
-				
-				writeOut = new BufferedWriter(new OutputStreamWriter(out));
-				readIn = new BufferedReader(new InputStreamReader(in));
-				errIn = new BufferedReader(new InputStreamReader(err));
+				setupProc(context);
 			} catch (JSONException e) {
 				e.printStackTrace();
 			}
+			
+		}
+		
+		public void setupProc(Context context) throws IOException{
+			proc = StreamingUtils.buildProcess(context.getConfiguration().get("mapper.command"));
+			
+			out = proc.getOutputStream();
+			in = proc.getInputStream();
+			err = proc.getErrorStream();
+			
+			writeOut = new BufferedWriter(new OutputStreamWriter(out));
+			readIn = new BufferedReader(new InputStreamReader(in));
+			errIn = new BufferedReader(new InputStreamReader(err));
 		}
 	}
 	
