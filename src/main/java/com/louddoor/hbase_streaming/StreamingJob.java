@@ -61,6 +61,7 @@ public class StreamingJob {
 		{
 			map = values.getNoVersionMap();
 			
+			
 			if(procout.procDied())
 			{
 				
@@ -68,33 +69,8 @@ public class StreamingJob {
 				map(rowKey, values, context, retries + 1);
 				
 			}
-			try {
-				JSONObject val = new JSONObject();
-
-				for(Entry<byte[], NavigableMap<byte[], byte[]>> ent : map.entrySet())
-				{
-					JSONObject innerVal = new JSONObject();
-					for(Entry<byte[], byte[]> inner : ent.getValue().entrySet())
-					{
-						Object value;
-						
-						value = Bytes.toString(inner.getValue());
-						
-						innerVal.put(Bytes.toString(inner.getKey()), value);
-					}
-
-					val.put(Bytes.toString(ent.getKey()), innerVal);
-				}
-
-				line = Bytes.toString(rowKey.get()) + "\t" + val.toString() + "\n";
-
-				procout.writeMsg(line);
-			} 
-			catch(JSONException e)
-			{
-				e.printStackTrace();
-			}
-
+			
+			procout.write(map);
 			
 		}
 
