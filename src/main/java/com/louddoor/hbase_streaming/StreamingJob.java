@@ -72,8 +72,8 @@ public class StreamingJob {
 				
 				Iterator<Entry<byte[], NavigableMap<byte[], byte[]>>> i = map.entrySet().iterator();
 				
-				writeOut.write(Bytes.toString(rowKey.get()) + "\t");
-
+				jg.writeRaw(Bytes.toString(rowKey.get()) + "\t");
+				
 				jg.writeStartObject();
 				
 				while(i.hasNext())
@@ -97,7 +97,7 @@ public class StreamingJob {
 
 				jg.writeEndObject();
 				
-				writeOut.write("\n");
+				jg.writeRaw("\n");
 				
 				jg.flush();
 				
