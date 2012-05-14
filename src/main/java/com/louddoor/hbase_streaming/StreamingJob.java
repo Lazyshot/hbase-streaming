@@ -31,6 +31,7 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.GenericOptionsParser;
+import org.codehaus.jackson.JsonFactory;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -43,8 +44,7 @@ public class StreamingJob {
 	public static class StreamingMapper extends TableMapper<Text, Text>
 	{
 		Process proc = null;
-		OutputStream out;
-		BufferedWriter writeOut;
+		ProcessOutputWriter procout;
 		ProcessInputMapperReader procin;
 		
 		String line = "";
@@ -59,10 +59,16 @@ public class StreamingJob {
 		public void map(ImmutableBytesWritable rowKey, Result values, Context context, int retries) 
 		throws IOException,  InterruptedException
 		{
-			map = values.getNoVersionMap();			
+			map = values.getNoVersionMap();
 			
+			if(procout.procDied())
+			{
+				
+				setupProc(context);
+				map(rowKey, values, context, retries + 1);
+				
+			}
 			try {
-
 				JSONObject val = new JSONObject();
 
 				for(Entry<byte[], NavigableMap<byte[], byte[]>> ent : map.entrySet())
@@ -82,21 +88,10 @@ public class StreamingJob {
 
 				line = Bytes.toString(rowKey.get()) + "\t" + val.toString() + "\n";
 
-				writeOut.write(line);
-				
-			} catch(Exception e) {
-				
-				if(e.getMessage().contains("pipe"))
-				{
-					if(retries > 5)
-					{
-						throw new InterruptedException("Mapper failed to launch process 5 times - Check err logs");
-					}
-					
-					setupProc(context);
-					map(rowKey, values, context, retries + 1);
-				}
-				
+				procout.writeMsg(line);
+			} 
+			catch(JSONException e)
+			{
 				e.printStackTrace();
 			}
 
@@ -113,8 +108,7 @@ public class StreamingJob {
 				e.printStackTrace();
 			}
 			
-		}
-		
+		}		
 		public void setupProc(Context context) throws IOException{
 			if(procin != null)
 			{
@@ -124,10 +118,18 @@ public class StreamingJob {
 			
 			proc = StreamingUtils.buildProcess(context.getConfiguration().get("mapper.command"));
 			
-			out = proc.getOutputStream();
-			writeOut = new BufferedWriter(new OutputStreamWriter(out));
+			if(procout != null)
+			{
+				procout.stopThread();
+				procout.interrupt();
+				procout.setProcess(proc);
+			}
+			else
+			{
+				procout = new ProcessOutputWriter(proc);
+			}
 			
-			
+			procout.start();
 			
 			procin = new ProcessInputMapperReader(proc, context);
 			procin.start();
@@ -135,7 +137,13 @@ public class StreamingJob {
 		
 		public void cleanup(Context context)
 		{
-			procin.stopThread();
+			try {
+				procout.finishUp();
+				procout.wait();
+				procin.wait();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
 		}
 	}
 	
