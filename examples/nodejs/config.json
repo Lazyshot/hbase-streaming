@@ -1,5 +1,5 @@
 {
-	"name": "edges_count",
+	"name": "edges_count_nodejs",
 	
 	"input":{
 		"hbase_table": "users",
