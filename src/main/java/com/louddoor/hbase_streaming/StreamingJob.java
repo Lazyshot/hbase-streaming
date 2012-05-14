@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.util.Map.Entry;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.NavigableMap;
 
 import org.apache.commons.cli.CommandLine;
@@ -32,6 +34,7 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.GenericOptionsParser;
 import org.codehaus.jackson.JsonFactory;
+import org.codehaus.jackson.JsonGenerator;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -43,12 +46,16 @@ public class StreamingJob {
 	
 	public static class StreamingMapper extends TableMapper<Text, Text>
 	{
-		Process proc = null;
-		ProcessOutputWriter procout;
-		ProcessInputMapperReader procin;
+		private OutputStream out;
+		private BufferedWriter writeOut;
 		
-		String line = "";
-		NavigableMap<byte[], NavigableMap<byte[], byte[]>> map;
+		private Process proc = null;		
+		private ProcessInputMapperReader procin;
+		
+		private NavigableMap<byte[], NavigableMap<byte[], byte[]>> map;
+		
+		private JsonFactory f = new JsonFactory();
+		private JsonGenerator jg = null;
 		
 		public void map(ImmutableBytesWritable rowKey, Result values, Context context) 
 		throws IOException,  InterruptedException
@@ -61,16 +68,50 @@ public class StreamingJob {
 		{
 			map = values.getNoVersionMap();
 			
-			
-			if(procout.procDied())
-			{
+			try {
 				
-				setupProc(context);
-				map(rowKey, values, context, retries + 1);
+				Iterator<Entry<byte[], NavigableMap<byte[], byte[]>>> i = map.entrySet().iterator();
+
+				jg.writeStartObject();
 				
+				while(i.hasNext())
+				{
+					Entry<byte[], NavigableMap<byte[], byte[]>> ent =  i.next();
+
+					jg.writeObjectFieldStart(Bytes.toString(ent.getKey()));
+
+					Map<byte[], byte[]> inner = ent.getValue();
+					Iterator<Entry<byte[], byte[]>> j = inner.entrySet().iterator();
+
+					while(j.hasNext())
+					{
+						Entry<byte[], byte[]> innerEnt = (Entry<byte[], byte[]>) j.next();
+
+						jg.writeStringField(Bytes.toString(innerEnt.getKey()), Bytes.toString(innerEnt.getValue()));
+					}
+
+					jg.writeEndObject();
+				}
+
+				jg.writeEndObject();
+
+				jg.flush();
+				
+			} catch(Exception e) {
+
+				if(e.getMessage().contains("pipe"))
+				{
+					if(retries > 5)
+					{
+						throw new InterruptedException("Mapper failed to launch process 5 times - Check err logs");
+					}
+
+					setupProc(context);
+					map(rowKey, values, context, retries + 1);
+				}
+
+				e.printStackTrace();
 			}
-			
-			procout.write(map);
 			
 		}
 
@@ -91,21 +132,13 @@ public class StreamingJob {
 				procin.stopThread();
 				procin.interrupt();
 			}
-			
+
 			proc = StreamingUtils.buildProcess(context.getConfiguration().get("mapper.command"));
+
+			out = proc.getOutputStream();
+			writeOut = new BufferedWriter(new OutputStreamWriter(out));
 			
-			if(procout != null)
-			{
-				procout.stopThread();
-				procout.interrupt();
-				procout.setProcess(proc);
-			}
-			else
-			{
-				procout = new ProcessOutputWriter(proc);
-			}
-			
-			procout.start();
+			jg = f.createJsonGenerator(writeOut);
 			
 			procin = new ProcessInputMapperReader(proc, context);
 			procin.start();
@@ -113,13 +146,7 @@ public class StreamingJob {
 		
 		public void cleanup(Context context)
 		{
-			try {
-				procout.finishUp();
-				procout.wait();
-				procin.wait();
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
+			procin.interrupt();
 		}
 	}
 	
