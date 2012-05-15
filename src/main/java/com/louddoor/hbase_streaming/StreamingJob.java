@@ -162,41 +162,38 @@ public class StreamingJob {
 		
 		ProcessInputReducerReader procin;
 		
-		String line = "";
-		NavigableMap<byte[], NavigableMap<byte[], byte[]>> map;
+		private JsonFactory f = new JsonFactory();
+		private JsonGenerator jg = null;
+		
 		
 		public void reduce(Text id, Iterable<Text> values, Context context)
 			throws IOException, InterruptedException 
 		{
-			JSONArray vals = new JSONArray();
-			
-			for(Text val : values)
-			{
-				vals.put(val.toString());
-			}
-			
-			reduce(id, vals, context, 0);
-		}
-		
-		public void reduce(Text id, JSONArray values, Context context, int retries)
-			throws IOException, InterruptedException 
-		{
 			try {
 				
-				line = id + "\t" + values.toString() + "\n";
+				jg.writeRaw(id + "\t");
 				
-				writeOut.write(line);
+				Iterator<Text> i = values.iterator();
+				
+				jg.writeStartArray();
+				
+				while(i.hasNext())
+				{
+					Text val = i.next();
+					
+					jg.writeString(val.toString());
+				}
+				
+				jg.writeEndArray();
+				
+				jg.writeRaw("\n");
+				
+				jg.flush();
 				
 			} catch(Exception e) {				
 				if(e.getMessage().contains("pipe"))
-				{
-					if(retries > 5)
-					{
-						throw new InterruptedException("Mapper failed to launch process 5 times - Check err logs");
-					}
-					
+				{					
 					setupProc(context);
-					reduce(id, values, context, retries + 1);
 				}
 				
 				e.printStackTrace();
@@ -227,6 +224,8 @@ public class StreamingJob {
 			
 			out = proc.getOutputStream();
 			writeOut = new BufferedWriter(new OutputStreamWriter(out));
+			
+			jg = f.createJsonGenerator(writeOut);
 			
 			procin = new ProcessInputReducerReader(proc, context);
 			procin.start();
