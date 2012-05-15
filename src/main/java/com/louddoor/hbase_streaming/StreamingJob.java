@@ -30,6 +30,7 @@ import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.GenericOptionsParser;
@@ -50,7 +51,7 @@ public class StreamingJob {
 		private BufferedWriter writeOut;
 		
 		private Process proc = null;		
-		private ProcessInputMapperReader procin;
+		private ProcessInputReader<TableMapper<Text, Text>.Context> procin;
 		
 		private NavigableMap<byte[], NavigableMap<byte[], byte[]>> map;
 		
@@ -144,7 +145,7 @@ public class StreamingJob {
 			
 			jg = f.createJsonGenerator(writeOut);
 			
-			procin = new ProcessInputMapperReader(proc, context);
+			procin = new ProcessInputReader<TableMapper<Text, Text>.Context>(proc, context);
 			procin.start();
 		}
 		
@@ -160,7 +161,7 @@ public class StreamingJob {
 		OutputStream out;
 		BufferedWriter writeOut;
 		
-		ProcessInputReducerReader procin;
+		ProcessInputReader<Reducer<Text, Text, Text, Text>.Context> procin;
 		
 		private JsonFactory f = new JsonFactory();
 		private JsonGenerator jg = null;
@@ -227,7 +228,7 @@ public class StreamingJob {
 			
 			jg = f.createJsonGenerator(writeOut);
 			
-			procin = new ProcessInputReducerReader(proc, context);
+			procin = new ProcessInputReader<Reducer<Text, Text, Text, Text>.Context>(proc, context);
 			procin.start();
 		}
 		

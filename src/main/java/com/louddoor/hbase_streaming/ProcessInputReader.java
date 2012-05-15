@@ -4,14 +4,15 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.TaskInputOutputContext;
 
 
 
-public class ProcessInputMapperReader extends Thread {
+@SuppressWarnings("rawtypes")
+public class ProcessInputReader<C extends TaskInputOutputContext> extends Thread {
 	Process _proc;
-	TableMapper<Text, Text>.Context _context;
+	C _context;
 	
 	BufferedReader readIn;
 	BufferedReader errIn;
@@ -24,7 +25,7 @@ public class ProcessInputMapperReader extends Thread {
 	
 	private boolean stop = false;
 	
-	ProcessInputMapperReader(Process proc, TableMapper<Text, Text>.Context context)
+	ProcessInputReader(Process proc, C context)
 	{
 		
 		_context = context;
@@ -43,6 +44,7 @@ public class ProcessInputMapperReader extends Thread {
 		stop = true;
 	}
 
+	@SuppressWarnings("unchecked")
 	public void run()
 	{
 		try {
