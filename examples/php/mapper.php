@@ -5,7 +5,7 @@
 function proc($key, $val){
 
         incCounter("Users", "Total");
-        
+
         if(empty($val['pages']))
                 return;
 
@@ -36,6 +36,8 @@ while(true)
                 fwrite(STDERR, "issue with input: " . $line);
         else
                 proc($parts[0], json_decode($parts[1], true));
+
+        echo "|next|\n";
 }
 
 
