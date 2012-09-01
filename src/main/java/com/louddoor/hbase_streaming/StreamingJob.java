@@ -1,15 +1,12 @@
 package com.louddoor.hbase_streaming;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.util.Map.Entry;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.NavigableMap;
-
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
@@ -33,8 +30,6 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.GenericOptionsParser;
-import org.codehaus.jackson.JsonFactory;
-import org.codehaus.jackson.JsonGenerator;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -45,78 +40,74 @@ public class StreamingJob {
 	static final String NAME = "";
 	
 	public static class StreamingMapper extends TableMapper<Text, Text>
-	{
-		private OutputStream out;
-		private BufferedWriter writeOut;
+	{		
+		private Process proc = null;
+		private Serializer serializer;
 		
-		private Process proc = null;		
-		private ProcessInputReader<TableMapper<Text, Text>.Context> procin;
+		BufferedReader readIn;
+		BufferedReader errIn;
 		
-		private NavigableMap<byte[], NavigableMap<byte[], byte[]>> map;
+		InputStream in;
+		InputStream err;
 		
-		private JsonFactory f = new JsonFactory();
-		private JsonGenerator jg = null;
+		private boolean stop = false;
+		
+		Text cKey = new Text();
+		Text cVal = new Text();
 		
 		public void map(ImmutableBytesWritable rowKey, Result values, Context context) 
 		throws IOException,  InterruptedException
 		{
-			map(rowKey, values, context, 0);
-		}
-
-		public void map(ImmutableBytesWritable rowKey, Result values, Context context, int retries) 
-		throws IOException,  InterruptedException
-		{
-			map = values.getNoVersionMap();
-			
 			try {
+				stop = false;
 				
-				Iterator<Entry<byte[], NavigableMap<byte[], byte[]>>> i = map.entrySet().iterator();
+				serializer.writeMap(rowKey, values);
 				
-				jg.writeRaw(Bytes.toString(rowKey.get()) + "\t");
-				
-				jg.writeStartObject();
-				
-				while(i.hasNext())
+				while(readIn.ready() && stop == false)
 				{
-					Entry<byte[], NavigableMap<byte[], byte[]>> ent =  i.next();
+					String readLine = readIn.readLine();
+					
+					if (readLine.equals("|next|"))
+						stop = true;
+					
+					String[] lineParts = readLine.split("\t");
+					String sval = "";
 
-					jg.writeObjectFieldStart(Bytes.toString(ent.getKey()));
-
-					Map<byte[], byte[]> inner = ent.getValue();
-					Iterator<Entry<byte[], byte[]>> j = inner.entrySet().iterator();
-
-					while(j.hasNext())
+					for(int i = 0; i < lineParts.length; i++)
 					{
-						Entry<byte[], byte[]> innerEnt = (Entry<byte[], byte[]>) j.next();
-
-						jg.writeStringField(Bytes.toString(innerEnt.getKey()), Bytes.toString(innerEnt.getValue()));
+						if(i == 0)
+							cKey.set(lineParts[i]);
+						else
+							sval += lineParts[i] + "\t";
 					}
 
-					jg.writeEndObject();
+					cVal.set(sval);
+
+					context.write(cKey, cVal);
 				}
 
-				jg.writeEndObject();
-				
-				jg.writeRaw("\n");
-				
-				jg.flush();
-				
-			} catch(Exception e) {
 
-				if(e.getMessage().contains("pipe"))
+				while(errIn.ready())
 				{
-					if(retries > 5)
+					String errLine = errIn.readLine();
+					
+					if (errLine.equals(""))
+						break;
+
+					if(errLine.contains("reporter:counter"))
 					{
-						throw new InterruptedException("Mapper failed to launch process 5 times - Check err logs");
+						String[] parts = errLine.split(":")[2].split(",");
+
+						context.getCounter(parts[0], parts[1]).increment(Long.parseLong(parts[2]));
+					} else {
+						System.err.println(errLine);
 					}
-
-					setupProc(context);
-					map(rowKey, values, context, retries + 1);
 				}
-
+				
+			} catch (Exception e) {
 				e.printStackTrace();
+				throw new InterruptedException(e.getMessage());
 			}
-			
 		}
 
 		public void setup(Context context)
@@ -129,28 +120,25 @@ public class StreamingJob {
 				e.printStackTrace();
 			}
 			
+			String ser = context.getConfiguration().get("streaming.serializer", "json");
+			
+			if (ser.equals("json"))
+			{
+				serializer = new JsonSerializer(proc.getOutputStream());
+			} else {
+				serializer = new ByteSerializer(proc.getOutputStream());
+			}
+			
 		}		
 		public void setupProc(Context context) throws IOException{
-			if(procin != null)
-			{
-				procin.stopThread();
-				procin.interrupt();
-			}
-
+			
+			in = proc.getInputStream();
+			err = proc.getErrorStream();
+			
+			readIn = new BufferedReader(new InputStreamReader(in));
+			errIn = new BufferedReader(new InputStreamReader(err));
+			
 			proc = StreamingUtils.buildProcess(context.getConfiguration().get("mapper.command"));
-
-			out = proc.getOutputStream();
-			writeOut = new BufferedWriter(new OutputStreamWriter(out));
-			
-			jg = f.createJsonGenerator(writeOut);
-			
-			procin = new ProcessInputReader<TableMapper<Text, Text>.Context>(proc, context);
-			procin.start();
-		}
-		
-		public void cleanup(Context context)
-		{
-			procin.interrupt();
 		}
 	}
 	
@@ -159,47 +147,70 @@ public class StreamingJob {
 		Process proc = null;
 		OutputStream out;
 		BufferedWriter writeOut;
+		Serializer serializer;
 		
-		ProcessInputReader<Reducer<Text, Text, Text, Text>.Context> procin;
+		BufferedReader readIn;
+		BufferedReader errIn;
 		
-		private JsonFactory f = new JsonFactory();
-		private JsonGenerator jg = null;
+		InputStream in;
+		InputStream err;
+		
+		private boolean stop = false;
+		
+		Text cKey = new Text();
+		Text cVal = new Text();
 		
 		
 		public void reduce(Text id, Iterable<Text> values, Context context)
 			throws IOException, InterruptedException 
 		{
 			try {
+				serializer.writeReduce(id, values);
 				
-				jg.writeRaw(id + "\t");
-				
-				Iterator<Text> i = values.iterator();
-				
-				jg.writeStartArray();
-				
-				while(i.hasNext())
+				while(readIn.ready() && stop == false)
 				{
-					Text val = i.next();
+					String readLine = readIn.readLine();
 					
-					jg.writeString(val.toString());
-				}
-				
-				jg.writeEndArray();
-				
-				jg.writeRaw("\n");
-				
-				jg.flush();
-				
-			} catch(Exception e) {				
-				if(e.getMessage().contains("pipe"))
-				{					
-					setupProc(context);
-				}
-				
-				e.printStackTrace();
-			}
+					if (readLine.equals("|next|"))
+						stop = true;
+					
+					String[] lineParts = readLine.split("\t");
+					String sval = "";
 
-			
+					for(int i = 0; i < lineParts.length; i++)
+					{
+						if(i == 0)
+							cKey.set(lineParts[i]);
+						else
+							sval += lineParts[i] + "\t";
+					}
+
+					cVal.set(sval);
+
+					context.write(cKey, cVal);
+				}
+
+
+				while(errIn.ready())
+				{
+					String errLine = errIn.readLine();
+					
+					if (errLine.equals(""))
+						break;
+
+					if(errLine.contains("reporter:counter"))
+					{
+						String[] parts = errLine.split(":")[2].split(",");
+
+						context.getCounter(parts[0], parts[1]).increment(Long.parseLong(parts[2]));
+					} else {
+						System.err.println(errLine);
+					}
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+				throw new InterruptedException(e.getMessage());
+			}
 		}
 
 		public void setup(Context context)
@@ -213,27 +224,17 @@ public class StreamingJob {
 			}
 		}
 		
-		public void setupProc(Context context) throws IOException{
-			if(procin != null)
-			{
-				procin.stopThread();
-				procin.interrupt();
-			}
-			
+		public void setupProc(Context context) throws IOException{			
 			proc = StreamingUtils.buildProcess(context.getConfiguration().get("mapper.command"));
 			
-			out = proc.getOutputStream();
-			writeOut = new BufferedWriter(new OutputStreamWriter(out));
+			String ser = context.getConfiguration().get("streaming.serializer", "json");
 			
-			jg = f.createJsonGenerator(writeOut);
-			
-			procin = new ProcessInputReader<Reducer<Text, Text, Text, Text>.Context>(proc, context);
-			procin.start();
-		}
-		
-		public void cleanup(Context context)
-		{
-			procin.stopThread();
+			if (ser.equals("json"))
+			{
+				serializer = new JsonSerializer(proc.getOutputStream());
+			} else {
+				serializer = new ByteSerializer(proc.getOutputStream());
+			}
 		}
 	
 	}
@@ -268,13 +269,17 @@ public class StreamingJob {
 							.withDescription("Name of the job for reference")
 							.create("name");
 		
+		Option serializer = OptionBuilder.withArgName("serializer").hasArgs()
+							.withDescription("Serialization type (json/byte)")
+							.create("serializer");
+		
 		options.addOption(configOption);
 		options.addOption(files);
 		options.addOption(numReducers);
 		options.addOption(reducerCmd);
 		options.addOption(mapperCmd);
 		options.addOption(name);
-		
+		options.addOption(serializer);
 		return options;
 	}
 	
@@ -330,9 +335,11 @@ public class StreamingJob {
 		
 		String mapperCommand = line.getOptionValue("mapper");
 		String reducerCommand = line.getOptionValue("reducer");
+		String serializer = line.getOptionValue("serializer");
 		
 		job.getConfiguration().set("mapper.command", mapperCommand);
 		job.getConfiguration().set("reducer.command", reducerCommand);
+		job.getConfiguration().set("streaming.serializer", serializer);
 		
 		if(line.hasOption("file")) {
 			
