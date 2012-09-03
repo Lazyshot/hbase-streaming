@@ -263,10 +263,12 @@ public class StreamingJob {
 		
 		Option reducerCmd = OptionBuilder.withArgName("cmd").hasArgs()
 							.withDescription("Reducer Command")
+							.isRequired()
 							.create("reducer");
 		
 		Option mapperCmd = OptionBuilder.withArgName("cmd").hasArgs()
 							.withDescription("Mapper Command")
+							.isRequired()
 							.create("mapper");
 		
 		Option name = OptionBuilder.withArgName("name").hasArgs()
@@ -343,7 +345,9 @@ public class StreamingJob {
 		
 		job.getConfiguration().set("mapper.command", mapperCommand);
 		job.getConfiguration().set("reducer.command", reducerCommand);
-		job.getConfiguration().set("streaming.serializer", serializer);
+		
+		if (serializer != null)
+			job.getConfiguration().set("streaming.serializer", serializer);
 		
 		if(line.hasOption("file")) {
 			
