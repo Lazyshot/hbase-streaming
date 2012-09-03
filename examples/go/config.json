@@ -1,0 +1,16 @@
+{
+	"name": "edges_count_go",
+	
+	"input":{
+		"hbase_table": "users",
+		"scan_caching": 150,
+		"families": ["pages"]
+	},
+	
+	"output": {
+		"type": "hdfs",
+		"path": "/user/bryan/go_example_job",
+		"overwrite": true
+	}
+}
+
