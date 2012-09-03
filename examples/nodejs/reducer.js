@@ -25,7 +25,7 @@ function proc(line) {
     var parts = line.split("\t");
     key = parts[0];
     val = JSON.parse(parts[1]);
-    
+
     exec(key, val);
 };
 
@@ -33,15 +33,21 @@ var emit = function(key, val){
 	stdout.write(key + "\t" + val + "\n");
 }
 
+var next = function() {
+    stdout.write("|next|\n");
+}
+
 function exec(key, vals) {
     var sum = 0;
-	
+
 	for(var i = 0; i < vals.length; i++)
 	{
 		sum += parseInt(vals[i]);
 	}
-	
+
 	emit(key, sum);
+
+    next();
 }
 
 stdin.resume();

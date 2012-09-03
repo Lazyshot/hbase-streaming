@@ -25,12 +25,16 @@ function proc(line) {
     var parts = line.split("\t");
     key = parts[0];
     val = JSON.parse(parts[1]);
-    
+
     exec(key, val);
 };
 
 var emit = function(key, val){
 	stdout.write(key + "\t" + val + "\n");
+}
+
+var next = function() {
+    stdout.write("|next|\n");
 }
 
 function exec(key, val) {
