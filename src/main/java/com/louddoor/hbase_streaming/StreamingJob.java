@@ -131,14 +131,13 @@ public class StreamingJob {
 			
 		}		
 		public void setupProc(Context context) throws IOException{
+			proc = StreamingUtils.buildProcess(context.getConfiguration().get("mapper.command"));
 			
 			in = proc.getInputStream();
 			err = proc.getErrorStream();
 			
 			readIn = new BufferedReader(new InputStreamReader(in));
 			errIn = new BufferedReader(new InputStreamReader(err));
-			
-			proc = StreamingUtils.buildProcess(context.getConfiguration().get("mapper.command"));
 		}
 	}
 	
@@ -159,7 +158,6 @@ public class StreamingJob {
 		
 		Text cKey = new Text();
 		Text cVal = new Text();
-		
 		
 		public void reduce(Text id, Iterable<Text> values, Context context)
 			throws IOException, InterruptedException 
@@ -226,6 +224,12 @@ public class StreamingJob {
 		
 		public void setupProc(Context context) throws IOException{			
 			proc = StreamingUtils.buildProcess(context.getConfiguration().get("mapper.command"));
+			
+			in = proc.getInputStream();
+			err = proc.getErrorStream();
+			
+			readIn = new BufferedReader(new InputStreamReader(in));
+			errIn = new BufferedReader(new InputStreamReader(err));
 			
 			String ser = context.getConfiguration().get("streaming.serializer", "json");
 			
