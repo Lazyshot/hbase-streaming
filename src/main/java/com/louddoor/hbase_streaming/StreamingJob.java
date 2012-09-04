@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.URI;
 import java.util.Date;
 
 import org.apache.commons.cli.CommandLine;
@@ -29,7 +30,6 @@ import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
@@ -368,7 +368,7 @@ public class StreamingJob {
 				
 				fs.copyFromLocalFile(s, d);
 				
-				DistributedCache.addCacheFile(d.toUri(), job.getConfiguration());
+				DistributedCache.addCacheFile(new URI(dest + "/" + file + "#" + file), job.getConfiguration());
 			}
 
 		}
