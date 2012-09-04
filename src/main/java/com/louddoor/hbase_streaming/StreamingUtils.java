@@ -1,15 +1,10 @@
 package com.louddoor.hbase_streaming;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.util.Iterator;
-
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.filecache.DistributedCache;
 import org.apache.hadoop.mapreduce.*;
 import org.json.JSONException;
-import org.json.JSONObject;
 
 public class StreamingUtils {
 	
@@ -23,32 +18,13 @@ public class StreamingUtils {
 	
 	public static void downloadFiles(Configuration config) throws JSONException, IOException
 	{
-		saveFiles(new JSONObject(config.get("files")));
+		saveFiles(config);
 	}
 	
-	public static void saveFiles(JSONObject files) throws JSONException, IOException
+	public static void saveFiles(Configuration conf) throws IOException
 	{
-		@SuppressWarnings("unchecked")
-		Iterator<String> it = files.keys();
-		
-		while(it.hasNext())
-		{
-			String file = it.next();
-			File f = new File(file);
-			String contents = files.getString(file);
-			
-			f.createNewFile();
-			f.setExecutable(true);
-			f.setReadable(true);
-			
-			FileWriter out = new FileWriter(f, false);
-			BufferedWriter writ = new BufferedWriter(out);
-			
-			writ.write(contents);
-			
-			writ.close();
-			out.close();
-		}
+		DistributedCache.getLocalCacheFiles(conf);
+		DistributedCache.createSymlink(conf);
 	}
 	
 	

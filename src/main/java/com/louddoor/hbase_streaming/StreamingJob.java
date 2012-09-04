@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.util.Date;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
@@ -15,6 +17,7 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.filecache.DistributedCache;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
@@ -26,6 +29,7 @@ import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
@@ -327,7 +331,6 @@ public class StreamingJob {
 		
 		String name = line.getOptionValue("name");
 		
-		
 		job.setJarByClass(StreamingJob.class);
 		
 		if(line.hasOption("help"))
@@ -349,19 +352,25 @@ public class StreamingJob {
 		if (serializer != null)
 			job.getConfiguration().set("streaming.serializer", serializer);
 		
-		if(line.hasOption("file")) {
+		if (line.hasOption("file")) {
 			
+			FileSystem fs = FileSystem.get(conf);
+			
+			String dest = "/tmp/streaming_job/" + name + "_" +  new Date().getTime();
 			String[] files = line.getOptionValues("file");
-			JSONObject filesObj = new JSONObject();
 			
-			for(String file : files)
+			fs.mkdirs(new Path(dest));
+			
+			for (String file : files)
 			{
-				String contents = readFullFile(file);
+				Path s = new Path(file);
+				Path d = new Path(dest + "/" + file);
 				
-				filesObj.put(file, contents);
+				fs.copyFromLocalFile(s, d);
+				
+				DistributedCache.addCacheFile(d.toUri(), job.getConfiguration());
 			}
-			
-			job.getConfiguration().set("files", filesObj.toString());
+
 		}
 		
 		
