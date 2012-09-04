@@ -23,8 +23,7 @@ public class StreamingUtils {
 	
 	public static void saveFiles(Configuration conf) throws IOException
 	{
-		DistributedCache.getLocalCacheFiles(conf);
-		DistributedCache.createSymlink(conf);
+		DistributedCache.getCacheFiles(conf);
 	}
 	
 	

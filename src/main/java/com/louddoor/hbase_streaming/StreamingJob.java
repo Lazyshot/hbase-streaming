@@ -370,6 +370,8 @@ public class StreamingJob {
 				
 				DistributedCache.addCacheFile(new URI(dest + "/" + file + "#" + file), job.getConfiguration());
 			}
+			
+			DistributedCache.createSymlink(job.getConfiguration());
 
 		}
 		
